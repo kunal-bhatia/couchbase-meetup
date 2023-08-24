@@ -1,0 +1,70 @@
+version: '3.8'
+
+networks:
+  meetup-network:
+services:
+  meetup-app:
+    image: couchbase-meetup:latest
+    depends_on:
+      cb_node:
+        condition: service_healthy
+    networks:
+      - meetup-network
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    entrypoint:
+      - java
+      - -Dspring.config.location=/app/config/
+      - -Dspring.data.couchbase.bucket-name=persons
+      - -Dspring.couchbase.username=admin
+      - -Dspring.couchbase.password=admin2
+      - -Dspring.couchbase.connection-string=couchbase://cb_node
+      - -cp
+      - app:app/lib/*
+      - com.meetup.couchbase.demo.MeetupApplication
+  cb_node:
+    build:
+      context: couchbase
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 1
+    ports:
+      - 8091-8096:8091-8096
+      - 11210:11210
+    environment:
+      - CLUSTER_NAME=meetup-demo
+      - COUCHBASE_ADMINISTRATOR_USERNAME=Administrator
+      - COUCHBASE_ADMINISTRATOR_PASSWORD=admin1
+      - COUCHBASE_BUCKET=persons
+      - COUCHBASE_BUCKET_RAMSIZE=512
+      - COUCHBASE_RBAC_USERNAME=admin
+      - COUCHBASE_RBAC_PASSWORD=admin2
+      - COUCHBASE_RBAC_NAME=admin
+      - COUCHBASE_RAM_SIZE=2048
+      - COUCHBASE_INDEX_RAM_SIZE=512
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8091/index.html" ]
+      interval: 20s
+      timeout: 3s
+      retries: 20
+    networks:
+      - meetup-network
+  generator:
+    build:
+      context: vegeta
+      dockerfile: Dockerfile
+    command: sh -c "vegeta attack -rate 500 -targets=target-urls.txt -duration=30s | tee results.bin | vegeta report"
+    networks:
+      - meetup-network
+  pumba-loss:
+    image: gaiaadm/pumba
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: "--log-level debug --interval 20s netem --tc-image gaiadocker/iproute2 --duration 15s delay --time 3000 re2:couchbase-meetup_cb_node_[0-9]{1,2}"
+  pumba-corrupt:
+    image: gaiaadm/pumba
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: "--log-level debug --interval 20s netem --tc-image gaiadocker/iproute2 --duration 15s corrupt --percent 10 re2:couchbase-meetup_cb_node_[0-9]{1,2}"
+

@@ -1,0 +1,25 @@
+<!-- Logback config for Spring boot deployed at linux server -->
+<configuration debug="true" scan="true">
+    <property name="PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%level] %logger{1} [thread=%thread] [%mdc] - %msg%n"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Spring -->
+    <logger name="org.springframework" additivity="false" level="info">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
+    <!-- Application -->
+    <logger name="com.meetup.couchbase" additivity="false" level="info">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
